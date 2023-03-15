@@ -21,7 +21,7 @@ from modules import (
     GLU_Linear,
     quant_noise,
 )
-
+torch.cuda.set_device(0)
 
 class TransformerEncoder(nn.Module):
     def __init__(self, args):
@@ -36,7 +36,7 @@ class TransformerEncoder(nn.Module):
             kernel_size=args.conv_pos,
             padding=args.conv_pos // 2,
             groups=args.conv_pos_groups,
-        )
+        ).to('cuda')
         dropout = 0
         std = math.sqrt((4 * (1.0 - dropout)) / (args.conv_pos * self.embedding_dim))
         nn.init.normal_(self.pos_conv.weight, mean=0, std=std)

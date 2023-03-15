@@ -8,13 +8,15 @@ from tqdm import tqdm
 
 import numpy as np
 import torch
+torch.cuda.set_device(0)
+torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 class BEATsInference(object):
 
     def __init__(self, model_filename = 'fine-tuned-cpt2/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt', verbose=False):
         torch.set_grad_enabled(False)
         
-        self.checkpoint = torch.load(f'models/{model_filename}')
+        self.checkpoint = torch.load(f'models/{model_filename}')#, map_location='cuda')
         cfg = BEATsConfig(self.checkpoint['cfg'])
         self.beats = BEATs(cfg)
         
@@ -44,7 +46,6 @@ class BEATsInference(object):
                 maxtrack =  max([ta.shape[-1] for ta in tracks])
 
                 padded = [torch.nn.functional.pad(torch.from_numpy(np.array(ta)),(0,maxtrack-ta.shape[-1])) for ta in tracks]
-
                 if verbose:
                     print( [track.shape for track in padded])
 

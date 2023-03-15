@@ -13,6 +13,8 @@ import torch.nn as nn
 from torch.nn import LayerNorm
 import torchaudio.compliance.kaldi as ta_kaldi
 
+torch.cuda.set_device(0)
+torch.set_default_tensor_type('torch.cuda.FloatTensor')
 from backbone import (
     TransformerEncoder,
 )
@@ -80,24 +82,24 @@ class BEATs(nn.Module):
 
         self.embed = cfg.embed_dim
         self.post_extract_proj = (
-            nn.Linear(self.embed, cfg.encoder_embed_dim)
+            nn.Linear(self.embed, cfg.encoder_embed_dim)#.to('cuda')
             if self.embed != cfg.encoder_embed_dim
             else None
         )
 
         self.input_patch_size = cfg.input_patch_size
         self.patch_embedding = nn.Conv2d(1, self.embed, kernel_size=self.input_patch_size, stride=self.input_patch_size,
-                                         bias=cfg.conv_bias)
+                                         bias=cfg.conv_bias).to('cuda')
 
-        self.dropout_input = nn.Dropout(cfg.dropout_input)
+        self.dropout_input = nn.Dropout(cfg.dropout_input).to('cuda')
 
         assert not cfg.deep_norm or not cfg.layer_norm_first
-        self.encoder = TransformerEncoder(cfg)
-        self.layer_norm = LayerNorm(self.embed)
+        self.encoder = TransformerEncoder(cfg).to('cuda')
+        self.layer_norm = LayerNorm(self.embed).to('cuda')
 
         if cfg.finetuned_model:
-            self.predictor_dropout = nn.Dropout(cfg.predictor_dropout)
-            self.predictor = nn.Linear(cfg.encoder_embed_dim, cfg.predictor_class)
+            self.predictor_dropout = nn.Dropout(cfg.predictor_dropout).to('cuda')
+            self.predictor = nn.Linear(cfg.encoder_embed_dim, cfg.predictor_class).to('cuda')
         else:
             self.predictor = None
 
@@ -126,7 +128,7 @@ class BEATs(nn.Module):
             waveform = waveform.unsqueeze(0) * 2 ** 15
             fbank = ta_kaldi.fbank(waveform, num_mel_bins=128, sample_frequency=16000, frame_length=25, frame_shift=10)
             fbanks.append(fbank)
-        fbank = torch.stack(fbanks, dim=0)
+        fbank = torch.stack(fbanks, dim=0).to('cuda')
         fbank = (fbank - fbank_mean) / (2 * fbank_std)
         return fbank
 
