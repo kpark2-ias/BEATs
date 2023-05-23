@@ -15,7 +15,7 @@ import numpy as np
 
 import pdb
 
-torch.cuda.set_device(0)
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 # Create torch dataset
@@ -36,23 +36,13 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.encodings)
     
     def labels_to_num(self, cat):
-#         esc50_labels = ['dog', 'chirping_birds', 'vacuum_cleaner', 'thunderstorm',
-#            'door_wood_knock', 'can_opening', 'crow', 'clapping', 'fireworks',
-#            'chainsaw', 'airplane', 'mouse_click', 'pouring_water', 'train',
-#            'sheep', 'water_drops', 'church_bells', 'clock_alarm',
-#            'keyboard_typing', 'wind', 'footsteps', 'frog', 'cow',
-#            'brushing_teeth', 'car_horn', 'crackling_fire', 'helicopter',
-#            'drinking_sipping', 'rain', 'insects', 'laughing', 'hen', 'engine',
-#            'breathing', 'crying_baby', 'hand_saw', 'coughing',
-#            'glass_breaking', 'snoring', 'toilet_flush', 'pig',
-#            'washing_machine', 'clock_tick', 'sneezing', 'rooster',
-#            'sea_waves', 'siren', 'cat', 'door_wood_creaks', 'crickets']
-        esc50_labels = ['clean', 'protest', 'smoke']
+        
+        labels = [*set(self.labels)]
 
         labels_to_num = {}
 
-        for i in range(len(esc50_labels)):
-            labels_to_num[esc50_labels[i]] = i
+        for i in range(len(labels)):
+            labels_to_num[labels[i]] = i
 
         return labels_to_num[cat]
 
@@ -91,7 +81,8 @@ class BEATsFineTuning(object):
                     
                 tracks = list()
                 
-    def training(self, dataset, batch_size, **kwargs):
+    def training(self, dataset, categories, batch_size, **kwargs):
+
         # Configuration options
         k_folds = 5
         num_epochs = 30
@@ -137,7 +128,7 @@ class BEATsFineTuning(object):
                     param.requires_grad=True
 
             model.predictor = nn.Sequential(nn.LayerNorm((768, ), eps=1e-12), 
-                                             nn.Linear(768, 3))
+                                             nn.Linear(768, len(categories)))
 
             model.train()
 
@@ -243,7 +234,7 @@ class BEATsFineTuning(object):
             sum += value
             print(f'Average: {sum/len(results.items())} %')
     
-    def __call__(self, input_dir='/home/ubuntu/data/ESC-50-master/audio/', labels=None, **kwargs):
+    def __call__(self, input_dir=None, labels=None, **kwargs):
 
         if labels is None:
             labels = "/home/ubuntu/data/ESC-50-master/meta/esc50.csv"
@@ -258,6 +249,8 @@ class BEATsFineTuning(object):
         # Preprocess data
         X = list(labels["filename"])
         y = list(labels["category"])
+        
+        categories = [*set(y)]
 
         features = []
 
@@ -266,14 +259,14 @@ class BEATsFineTuning(object):
             torch.cuda.empty_cache()
         
         dataset = Dataset(features, y)
-        self.training(dataset, **kwargs)
+        self.training(dataset, categories, **kwargs)
         
   
 if __name__ == '__main__':
 
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('-b', '--batch_size', type=int, default=1 << 6, help='batch size')
+    parser.add_argument('-b', '--batch_size', type=int, default=1 << 6, help='batch size') 
     parser.add_argument('-f','--input_dir')
     parser.add_argument('-l','--labels')
     parser.add_argument('-e', '--num_epochs', type=int, default=30)
